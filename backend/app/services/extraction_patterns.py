@@ -98,6 +98,10 @@ class ContractPatterns:
                     r"(?i)monthly\s+(?:fee|payment|amount)[:\s]+\$?([\d,]+(?:\.\d{2})?)",
                     r"\$?([\d,]+(?:\.\d{2})?)\s+(?:USD|dollars)",
                     r"(?i)for\s+the\s+sum\s+of\s+\$?([\d,]+(?:\.\d{2})?)",
+                    # Enhanced patterns for invoice-style totals
+                    r"(?i)total\s+due\s*(?:\([^)]+\))?\s*:\s*([\d,]+(?:\.\d{2})?)\s*(?:USD|EUR|GBP|CAD)?",
+                    r"(?i)(?:grand\s+)?total\s*:\s*\$?([\d,]+(?:\.\d{2})?)",
+                    r"(?i)(?:invoice\s+)?total\s*:\s*\$?([\d,]+(?:\.\d{2})?)",
                 ],
                 processor=lambda x: ContractPatterns._parse_money(x),
                 confidence_base=0.7
@@ -240,6 +244,64 @@ class ContractPatterns:
                 ],
                 processor=lambda x: True if x else False,
                 confidence_base=0.7
+            ),
+
+            # Signature and Contact Information
+            "signatory_1_name": ExtractionPattern(
+                name="signatory_1_name",
+                patterns=[
+                    r"(?i)(?:for\s+.*?\n)?name\s*:\s*([A-Za-z\s.]+?)(?:\n|title|signature)",
+                    r"(?i)authorized\s+representative\s*:\s*([A-Za-z\s.]+?)(?:\n|$)",
+                    r"(?i)signed\s+by\s*:\s*([A-Za-z\s.]+?)(?:\n|$)",
+                ],
+                confidence_base=0.7
+            ),
+            "signatory_1_title": ExtractionPattern(
+                name="signatory_1_title",
+                patterns=[
+                    r"(?i)title\s*:\s*([A-Za-z\s.]+?)(?:\n|signature)",
+                    r"(?i)([A-Za-z\s]+(?:director|manager|head|lead|officer))\s*(?:\n|$)",
+                ],
+                confidence_base=0.65
+            ),
+            "signatory_2_name": ExtractionPattern(
+                name="signatory_2_name",
+                patterns=[
+                    r"(?i)(?:for\s+.*?\n.*?name\s*:\s*[^\n]+\n.*?){1}name\s*:\s*([A-Za-z\s.]+?)(?:\n|title|signature)",
+                ],
+                confidence_base=0.7
+            ),
+            "signatory_2_title": ExtractionPattern(
+                name="signatory_2_title",
+                patterns=[
+                    r"(?i)(?:for\s+.*?\n.*?title\s*:\s*[^\n]+\n.*?){1}title\s*:\s*([A-Za-z\s.]+?)(?:\n|signature)",
+                ],
+                confidence_base=0.65
+            ),
+
+            # Contact Information
+            "primary_contact_name": ExtractionPattern(
+                name="primary_contact_name",
+                patterns=[
+                    r"(?i)primary\s+contact\s*:\s*([A-Za-z\s.]+?)(?:\s+\([^)]+\)|—|$)",
+                    r"(?i)contact\s*:\s*([A-Za-z\s.]+?)(?:\s+\([^)]+\)|—|$)",
+                ],
+                confidence_base=0.8
+            ),
+            "primary_contact_email": ExtractionPattern(
+                name="primary_contact_email",
+                patterns=[
+                    r"(?i)([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+                ],
+                confidence_base=0.9
+            ),
+            "customer_address": ExtractionPattern(
+                name="customer_address",
+                patterns=[
+                    r"(?i)(?:customer\s+)?address\s*:\s*([^,\n]+,\s*[^,\n]+,\s*[^,\n]+)",
+                    r"(?i)(\d+\s+[A-Za-z\s]+,\s*[A-Za-z\s]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?,\s*[A-Z]{2,3})",
+                ],
+                confidence_base=0.8
             ),
         }
 

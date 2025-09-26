@@ -8,6 +8,7 @@ from app.models.contract import (
 )
 from app.services.extraction_patterns import ContractPatterns
 from app.services.pdf_processor import PDFProcessor
+from app.services.invoice_extraction_patterns import InvoiceExtractionPatterns
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,8 @@ class ContractExtractor:
         ]
         self.important_fields = [
             "termination_date", "governing_law", "auto_renewal",
-            "notice_period", "liability_cap"
+            "notice_period", "liability_cap", "line_items", "total_amount",
+            "payment_net_days", "payment_methods"
         ]
 
     async def process_contract(self, file_path: str) -> Dict:
@@ -80,6 +82,19 @@ class ContractExtractor:
         """Extract fields using regex patterns"""
         extracted_fields = {}
 
+        # Convert pages_data to ContractPage objects for enhanced extraction
+        from app.models.contract import ContractPage
+        contract_pages = [ContractPage(page=page["page"], content=page["content"]) for page in pages_data]
+
+        # Enhanced invoice and payment terms extraction
+        try:
+            invoice_fields = InvoiceExtractionPatterns.extract_invoice_and_terms(contract_pages)
+            extracted_fields.update(invoice_fields)
+            logger.info(f"Enhanced extraction found {len(invoice_fields)} invoice/payment fields")
+        except Exception as e:
+            logger.error(f"Error in enhanced invoice extraction: {e}")
+
+        # Standard field extraction using existing patterns
         for field_name, pattern in self.patterns.items():
             value, confidence, snippet = ContractPatterns.extract_field(full_text, pattern)
 
@@ -228,7 +243,7 @@ class ContractExtractor:
         score = 0.0
 
         # Financial completeness: 30 points
-        financial_fields = ["contract_value", "currency", "payment_terms", "billing_frequency"]
+        financial_fields = ["contract_value", "total_amount", "currency", "payment_terms", "billing_frequency", "line_items"]
         financial_score = self._calculate_category_score(fields, financial_fields, 30)
         score += financial_score
 
@@ -238,7 +253,7 @@ class ContractExtractor:
         score += party_score
 
         # Payment terms clarity: 20 points
-        payment_fields = ["payment_terms", "billing_frequency", "notice_period"]
+        payment_fields = ["payment_terms", "payment_net_days", "payment_methods", "late_fee_percentage", "billing_frequency", "notice_period"]
         payment_score = self._calculate_category_score(fields, payment_fields, 20)
         score += payment_score
 
