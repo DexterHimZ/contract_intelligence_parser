@@ -15,7 +15,9 @@ import {
   DollarSign,
   Scale,
   Shield,
-  RefreshCw
+  RefreshCw,
+  ShoppingCart,
+  Plus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -74,23 +76,56 @@ export default function ContractDetailPage() {
   const formatFieldValue = (field: ExtractedField) => {
     if (field.value === null || field.value === undefined) return 'N/A'
     if (typeof field.value === 'boolean') return field.value ? 'Yes' : 'No'
-    if (typeof field.value === 'number') return field.value.toLocaleString()
+    if (typeof field.value === 'number') {
+      // Format monetary values with currency if it looks like money
+      if (field.value > 0 && field.value % 1 === 0 && field.value > 100) {
+        return `$${field.value.toLocaleString()}`
+      }
+      return field.value.toLocaleString()
+    }
+    if (Array.isArray(field.value)) {
+      return field.value.join(', ')
+    }
     return String(field.value)
+  }
+
+  const formatLineItems = (lineItems: any[]) => {
+    if (!Array.isArray(lineItems)) return []
+    return lineItems.map((item, index) => ({
+      id: index,
+      description: item.description || 'N/A',
+      quantity: item.quantity || '1',
+      unitPrice: item.unit_price || 0,
+      currency: item.currency || 'USD',
+      total: item.line_total || 0
+    }))
   }
 
   const getFieldsByCategory = (fields: Record<string, ExtractedField>) => {
     const categories = {
       parties: ['party_1_name', 'party_2_name'],
       dates: ['effective_date', 'execution_date', 'termination_date', 'renewal_term', 'auto_renewal', 'notice_period'],
-      financial: ['contract_value', 'currency', 'payment_terms', 'billing_frequency'],
+      financial: ['contract_value', 'currency', 'payment_terms', 'billing_frequency', 'total_amount', 'total_due_amount', 'payment_net_days', 'late_fee_rate', 'late_fee_cadence'],
       legal: ['governing_law', 'liability_cap', 'confidentiality', 'termination_for_convenience', 'termination_for_cause'],
       sla: ['sla_uptime', 'support_hours']
     }
 
-    return Object.entries(categories).reduce((acc, [category, fieldNames]) => {
+    const categorizedFields = Object.entries(categories).reduce((acc, [category, fieldNames]) => {
       acc[category] = fieldNames.map(name => ({ name, field: fields[name] })).filter(({ field }) => field)
       return acc
     }, {} as Record<string, Array<{ name: string; field: ExtractedField }>>)
+
+    // Extract additional fields not in core categories
+    const coreFields = new Set(Object.values(categories).flat())
+    const additionalFields = Object.entries(fields)
+      .filter(([name]) => !coreFields.has(name) && name !== 'line_items' && name !== 'additional_fields')
+      .map(([name, field]) => ({ name, field }))
+
+    if (additionalFields.length > 0) {
+      categorizedFields.additional = additionalFields
+    }
+
+    return categorizedFields
   }
 
   const formatFieldName = (fieldName: string) => {
@@ -419,6 +454,61 @@ export default function ContractDetailPage() {
             </Card>
           )}
 
+          {/* Line Items */}
+          {contract.fields.line_items && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5" />
+                  Line Items
+                </CardTitle>
+                <CardDescription>
+                  Detailed breakdown of services or products
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-3 font-medium text-gray-900">Description</th>
+                        <th className="text-right p-3 font-medium text-gray-900">Qty</th>
+                        <th className="text-right p-3 font-medium text-gray-900">Unit Price</th>
+                        <th className="text-center p-3 font-medium text-gray-900">Currency</th>
+                        <th className="text-right p-3 font-medium text-gray-900">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formatLineItems(contract.fields.line_items.value).map((item) => (
+                        <tr key={item.id} className="border-b hover:bg-gray-50">
+                          <td className="p-3 font-medium">{item.description}</td>
+                          <td className="p-3 text-right">{item.quantity}</td>
+                          <td className="p-3 text-right">{item.unitPrice.toLocaleString()}</td>
+                          <td className="p-3 text-center">
+                            <Badge variant="outline">{item.currency}</Badge>
+                          </td>
+                          <td className="p-3 text-right font-medium">{item.total.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className={cn('px-2 py-1 rounded text-xs font-medium border', getConfidenceColor(contract.fields.line_items.confidence))}>
+                      {Math.round(contract.fields.line_items.confidence * 100)}% confidence
+                    </div>
+                  </div>
+                  {contract.fields.line_items.evidence && (
+                    <p className="text-xs text-gray-500">
+                      Page {contract.fields.line_items.evidence.page}: "{contract.fields.line_items.evidence.snippet.slice(0, 50)}..."
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Service Level Agreements */}
           {fieldsByCategory.sla.length > 0 && (
             <Card>
@@ -431,6 +521,41 @@ export default function ContractDetailPage() {
               <CardContent>
                 <div className="grid gap-4">
                   {fieldsByCategory.sla.map(({ name, field }) => (
+                    <div key={name} className="flex items-start justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-medium">{formatFieldName(name)}</h4>
+                        <p className="text-gray-600 mt-1">{formatFieldValue(field)}</p>
+                        {field.evidence && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Page {field.evidence.page}: "{field.evidence.snippet}"
+                          </p>
+                        )}
+                      </div>
+                      <div className={cn('px-2 py-1 rounded text-xs font-medium border', getConfidenceColor(field.confidence))}>
+                        {Math.round(field.confidence * 100)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Additional Fields */}
+          {fieldsByCategory.additional && fieldsByCategory.additional.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  Additional Extracted Fields
+                </CardTitle>
+                <CardDescription>
+                  Other fields extracted from the contract that don't fit standard categories
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4">
+                  {fieldsByCategory.additional.map(({ name, field }) => (
                     <div key={name} className="flex items-start justify-between p-4 border rounded-lg">
                       <div className="flex-1">
                         <h4 className="font-medium">{formatFieldName(name)}</h4>
