@@ -96,8 +96,8 @@ class BackgroundProcessor:
             contract.processing_progress = 0
             await contract.save()
 
-            # Get file path
-            file_path = Path(f"/app/uploads/{contract.filename}")
+            # Get file path with hash prefix (same format as upload)
+            file_path = Path(f"/app/uploads/{contract.hash}_{contract.filename}")
             if not file_path.exists():
                 raise FileNotFoundError(f"Contract file not found: {file_path}")
 

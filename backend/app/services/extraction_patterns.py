@@ -51,6 +51,12 @@ class ContractPatterns:
                     r"(?i)\b(?:effective|commencement|start)\s+date[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
                     r"(?i)effective\s+as\s+of\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
                     r"(?i)shall\s+commence\s+on\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    # Enhanced patterns for invoice-style contracts
+                    r"(?i)(?:agreement\s+)?(?:effective|executed|signed|dated)\s+(?:on\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    r"(?i)this\s+(?:agreement|contract).*?(?:dated|executed|signed)\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    r"(?i)(?:contract|agreement)\s+date[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    r"(?i)dated\s+this\s+\d{1,2}(?:st|nd|rd|th)?\s+day\s+of\s+([A-Za-z]+,?\s+\d{4})",
+                    r"(?i)executed\s+on\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
                 ],
                 processor=lambda x: ContractPatterns._parse_date(x),
                 confidence_base=0.7
@@ -70,6 +76,12 @@ class ContractPatterns:
                     r"(?i)(?:terminat|expir|end)(?:es|ing|ation)?\s+(?:on|date)[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
                     r"(?i)through\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
                     r"(?i)until\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    # Enhanced patterns for various termination date formats
+                    r"(?i)(?:contract|agreement)\s+(?:terminates|expires|ends)\s+(?:on\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    r"(?i)(?:expiry|expiration)\s+date[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    r"(?i)end\s+date[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    r"(?i)valid\s+(?:until|through)\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+                    r"(?i)contract\s+period[:\s]+.*?(?:to|until|through)\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
                 ],
                 processor=lambda x: ContractPatterns._parse_date(x),
                 confidence_base=0.65
@@ -96,12 +108,12 @@ class ContractPatterns:
                     r"(?i)total\s+annual\s+value[:\s]+\$?([\d,]+(?:\.\d{2})?)",
                     r"(?i)total\s+monthly\s+amount[:\s]+\$?([\d,]+(?:\.\d{2})?)",
                     r"(?i)monthly\s+(?:fee|payment|amount)[:\s]+\$?([\d,]+(?:\.\d{2})?)",
-                    r"\$?([\d,]+(?:\.\d{2})?)\s+(?:USD|dollars)",
-                    r"(?i)for\s+the\s+sum\s+of\s+\$?([\d,]+(?:\.\d{2})?)",
+                    # REMOVED: Generic USD/dollars pattern that captures first amounts
+                    # REMOVED: Generic \"for the sum of\" pattern
                     # Enhanced patterns for invoice-style totals
-                    r"(?i)total\s+due\s*(?:\([^)]+\))?\s*:\s*([\d,]+(?:\.\d{2})?)\s*(?:USD|EUR|GBP|CAD)?",
-                    r"(?i)(?:grand\s+)?total\s*:\s*\$?([\d,]+(?:\.\d{2})?)",
-                    r"(?i)(?:invoice\s+)?total\s*:\s*\$?([\d,]+(?:\.\d{2})?)",
+                    # REMOVED: Total due pattern - handled by enhanced extraction
+                    # REMOVED: Generic total pattern - handled by enhanced extraction
+                    # REMOVED: Generic invoice total pattern - handled by enhanced extraction
                 ],
                 processor=lambda x: ContractPatterns._parse_money(x),
                 confidence_base=0.7
@@ -129,11 +141,15 @@ class ContractPatterns:
             "billing_frequency": ExtractionPattern(
                 name="billing_frequency",
                 patterns=[
-                    r"(?i)\b(monthly|quarterly|annually|yearly|weekly|bi-weekly|semi-annually)\s+(?:billing|payment|invoice)",
-                    r"(?i)(?:billed|invoiced|paid)\s+(monthly|quarterly|annually|yearly|weekly)",
-                    r"(?i)(?:per|every)\s+(month|quarter|year|week)",
+                    # GUARD: Only explicit recurring billing patterns - VERY restrictive to avoid late fee confusion
+                    r"(?i)\b(monthly|quarterly|annually|yearly|weekly|bi-weekly|semi-annually)\s+(?:billing|payment|invoice)\s+(?:schedule|cycle|frequency)",
+                    r"(?i)(?:billed|invoiced|paid)\s+(monthly|quarterly|annually|yearly|weekly)\s+(?:in\s+advance|recurring)",
+                    r"(?i)(?:recurring|subscription)\s+(?:billing|payment)\s*:\s*(monthly|quarterly|annually|yearly|weekly)",
+                    r"(?i)billing\s+cycle\s*:\s*(monthly|quarterly|annually|yearly|weekly)",
+                    r"(?i)subscription\s+(?:billing|payment)\s*:\s*(monthly|quarterly|annually|yearly|weekly)",
+                    # Only explicit billing context - no generic "per month" patterns
                 ],
-                confidence_base=0.7
+                confidence_base=0.8  # Higher threshold for explicit billing only
             ),
 
             # Legal Terms
@@ -143,6 +159,12 @@ class ContractPatterns:
                     r"(?i)governed\s+by\s+(?:the\s+)?laws?\s+of\s+(?:the\s+)?(?:state\s+of\s+)?([A-Za-z\s]+?)(?:\.|,|\n)",
                     r"(?i)(?:applicable|governing)\s+law[:\s]+([A-Za-z\s]+?)(?:\.|,|\n)",
                     r"(?i)subject\s+to\s+(?:the\s+)?(?:exclusive\s+)?jurisdiction\s+of\s+([A-Za-z\s]+?)(?:\.|,|\n)",
+                    # Enhanced patterns for governing law
+                    r"(?i)governing\s+law[:\s]+(?:this\s+(?:agreement|contract)\s+(?:shall\s+be\s+)?)?(?:governed\s+by\s+)?(?:the\s+)?(?:laws?\s+of\s+)?(?:the\s+)?(?:state\s+of\s+)?([A-Za-z\s]+?)(?:\.|,|\n|dispute)",
+                    r"(?i)this\s+(?:agreement|contract).*?(?:governed|subject)\s+to.*?(?:laws?\s+of\s+)?(?:the\s+)?(?:state\s+of\s+)?([A-Za-z\s]+?)(?:\.|,|\n)",
+                    r"(?i)laws?\s+of\s+(?:the\s+)?(?:state\s+of\s+)?([A-Za-z\s]+?)\s+(?:shall\s+)?(?:apply|govern)",
+                    r"(?i)jurisdiction[:\s]+([A-Za-z\s]+?)(?:\.|,|\n|court)",
+                    r"(?i)disputes.*?(?:governed|resolved).*?(?:in\s+)?(?:the\s+)?(?:state\s+of\s+)?([A-Za-z\s]+?)(?:\.|,|\n)",
                 ],
                 confidence_base=0.75
             ),
@@ -152,6 +174,15 @@ class ContractPatterns:
                     r"(?i)liability.*?(?:shall\s+not\s+exceed|limited\s+to|cap(?:ped)?\s+at)\s+\$?([\d,]+(?:\.\d{2})?)",
                     r"(?i)maximum\s+liability.*?\$?([\d,]+(?:\.\d{2})?)",
                     r"(?i)aggregate\s+liability.*?\$?([\d,]+(?:\.\d{2})?)",
+                    # Enhanced patterns for liability caps
+                    r"(?i)liability.*?(?:capped|limited|restricted|maximum).*?\$?([\d,]+(?:\.\d{2})?)",
+                    r"(?i)(?:total|aggregate|maximum)\s+(?:damages|liability).*?\$?([\d,]+(?:\.\d{2})?)",
+                    r"(?i)liability\s+(?:is\s+)?limited\s+to\s+(?:a\s+maximum\s+of\s+)?\$?([\d,]+(?:\.\d{2})?)",
+                    r"(?i)damages.*?(?:shall\s+not\s+exceed|limited\s+to|maximum\s+of)\s+\$?([\d,]+(?:\.\d{2})?)",
+                    r"(?i)(?:cap\s+on\s+)?(?:damages|liability)[:\s]+\$?([\d,]+(?:\.\d{2})?)",
+                    r"(?i)liability.*?(?:up\s+to|not\s+to\s+exceed)\s+\$?([\d,]+(?:\.\d{2})?)",
+                    # Pattern for percentage-based caps
+                    r"(?i)liability.*?limited\s+to\s+(\d+)\s+months?\s+of\s+(?:fees|payments?)",
                 ],
                 processor=lambda x: ContractPatterns._parse_money(x),
                 confidence_base=0.65
@@ -180,6 +211,13 @@ class ContractPatterns:
                     r"(?i)contract\s+auto-renews\s+for\s+additional",
                     r"(?i)auto-renewal[:\s]+yes",
                     r"(?i)auto-renewal[:\s]+true",
+                    # Enhanced patterns for auto-renewal detection
+                    r"(?i)(?:contract|agreement)\s+(?:shall\s+)?(?:automatically\s+)?renew(?:s)?(?:\s+(?:for|automatically))?",
+                    r"(?i)(?:renew|extend)(?:al|s)?\s+(?:automatic(?:ally)?|auto)",
+                    r"(?i)(?:automatically\s+)?(?:renew|extend)(?:s|ed|ing)?\s+(?:for\s+)?(?:additional|successive|further)\s+(?:term|period)",
+                    r"(?i)(?:term|contract)\s+(?:shall\s+)?(?:be\s+)?(?:automatically\s+)?(?:renewed|extended)",
+                    r"(?i)unless\s+(?:either\s+party\s+)?(?:provides?\s+)?(?:written\s+)?notice.*?(?:renew|extend)",
+                    r"(?i)renewal[:\s]+(?:automatic|yes|true)",
                 ],
                 processor=lambda x: True if x else False,
                 confidence_base=0.75
@@ -199,6 +237,14 @@ class ContractPatterns:
                     r"(?i)(\d+)\s+days?\s+(?:written\s+)?notice",
                     r"(?i)notice\s+(?:period|of)[:\s]+(\d+)\s+days?",
                     r"(?i)at\s+least\s+(\d+)\s+days?\s+(?:prior\s+)?(?:written\s+)?notice",
+                    # Enhanced patterns for notice periods
+                    r"(?i)(?:with\s+)?(\d+)\s+days?\s+(?:prior\s+)?(?:written\s+)?notice\s+(?:of\s+termination|to\s+terminate)",
+                    r"(?i)terminate.*?(?:with\s+)?(\d+)\s+days?\s+(?:advance\s+)?(?:written\s+)?notice",
+                    r"(?i)(?:written\s+)?notice\s+of\s+(?:at\s+least\s+)?(\d+)\s+days?",
+                    r"(?i)(\d+)\s+days?\s+(?:advance\s+)?(?:written\s+)?notice\s+(?:prior\s+to|before)",
+                    r"(?i)(?:minimum|required)\s+notice[:\s]+(\d+)\s+days?",
+                    r"(?i)notice\s+requirement[:\s]+(\d+)\s+days?",
+                    r"(?i)(\d+)\s+days?\s+notice\s+(?:shall\s+be\s+)?(?:given|provided|required)",
                 ],
                 confidence_base=0.7
             ),

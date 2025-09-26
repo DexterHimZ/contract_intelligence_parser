@@ -231,7 +231,8 @@ async def download_contract(contract_id: str = Path(...)):
 async def reprocess_contract(
     contract_id: str = Path(...),
     use_ocr: bool = Query(True),
-    use_llm: bool = Query(False)
+    use_llm: bool = Query(False),
+    force: bool = Query(False)
 ):
     """
     Reprocess a contract with different settings
@@ -241,8 +242,8 @@ async def reprocess_contract(
         if not contract:
             raise HTTPException(status_code=404, detail="Contract not found")
 
-        # Check if already processing
-        if contract.status == ProcessingStatus.PROCESSING:
+        # Check if already processing (unless force is True)
+        if contract.status == ProcessingStatus.PROCESSING and not force:
             raise HTTPException(
                 status_code=400,
                 detail="Contract is already being processed"
